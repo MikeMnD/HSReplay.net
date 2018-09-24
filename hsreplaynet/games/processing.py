@@ -1244,10 +1244,13 @@ def do_process_upload_event(upload_event):
 	# Defer flushing the exporter until after the UploadEvent is set to SUCCESS
 	# So that the player can start watching their replay sooner
 	def do_flush_exporter():
+		if not should_load_into_redshift(upload_event, global_game):
+			return
+
 		can_attempt_redshift_load = False
 
 		if global_game.loaded_into_redshift is None:
-			log.debug("Global game has not been loaded into redshift.")
+			log.debug("Global game has not been loaded into redshift")
 			# Attempt to claim the advisory_lock, if successful:
 			can_attempt_redshift_load = global_game.acquire_redshift_lock()
 			if can_attempt_redshift_load:
@@ -1263,37 +1266,36 @@ def do_process_upload_event(upload_event):
 		if can_attempt_redshift_load:
 			log.debug("Redshift lock acquired. Will attempt to flush to redshift")
 
-			if should_load_into_redshift(upload_event, global_game):
-				with influx_timer("generate_redshift_game_info_duration"):
-					game_info = get_game_info(global_game, replay)
-				exporter.set_game_info(game_info)
+			with influx_timer("generate_redshift_game_info_duration"):
+				game_info = get_game_info(global_game, replay)
+			exporter.set_game_info(game_info)
 
-				try:
-					with influx_timer("flush_exporter_to_firehose_duration"):
-						flush_failures_report = flush_exporter_to_firehose(
-							exporter,
-							records_to_flush=get_records_to_flush()
-						)
-						for target_table, errors in flush_failures_report.items():
-							for error in errors:
-								influx_metric(
-									"firehose_flush_failure",
-									{
-										"stream_name": error["stream_name"],
-										"error_code": error["error_code"],
-										"error_message": error["error_message"],
-										"count": 1
-									},
-									target_table=target_table
-								)
-				except Exception:
-					raise
-				else:
-					global_game.loaded_into_redshift = timezone.now()
-					global_game.save()
-					# Okay to release the advisory lock once loaded_into_redshift is set
-					# It will also be released automatically when the lambda exits.
-					global_game.release_redshift_lock()
+			try:
+				with influx_timer("flush_exporter_to_firehose_duration"):
+					flush_failures_report = flush_exporter_to_firehose(
+						exporter,
+						records_to_flush=get_records_to_flush()
+					)
+					for target_table, errors in flush_failures_report.items():
+						for error in errors:
+							influx_metric(
+								"firehose_flush_failure",
+								{
+									"stream_name": error["stream_name"],
+									"error_code": error["error_code"],
+									"error_message": error["error_message"],
+									"count": 1
+								},
+								target_table=target_table
+							)
+			except Exception:
+				raise
+			else:
+				global_game.loaded_into_redshift = timezone.now()
+				global_game.save()
+				# Okay to release the advisory lock once loaded_into_redshift is set
+				# It will also be released automatically when the lambda exits.
+				global_game.release_redshift_lock()
 		else:
 			log.debug("Did not acquire redshift lock. Will not flush to redshift")
 
