@@ -7,6 +7,7 @@ from ipaddress import ip_address
 from django.conf import settings
 from django.templatetags.static import static
 from django.utils import timezone, translation
+from djpaypal.models import BillingAgreement
 
 from .html import HTMLHead
 from .i18n import lang_to_opengraph
@@ -142,6 +143,21 @@ class UserActivityMiddleware:
 		if request.user.is_authenticated:
 			request.user.last_site_activity = timezone.now()
 			request.user.save()
+
+		response = self.get_response(request)
+		return response
+
+
+class PayPalSyncMiddleware:
+	"""Middleware for updating PayPal subscriptions that are stuck in pending state"""
+
+	def __init__(self, get_response):
+		self.get_response = get_response
+
+	def __call__(self, request):
+		if request.user and request.user.is_authenticated:
+			for agreement in BillingAgreement.objects.filter(user=request.user, state="Pending"):
+				BillingAgreement.find_and_sync(agreement.id)
 
 		response = self.get_response(request)
 		return response

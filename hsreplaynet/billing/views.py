@@ -12,7 +12,6 @@ from django.utils.http import is_safe_url
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django.views.generic import View
-from djpaypal.models import BillingAgreement
 from djstripe.enums import SubscriptionStatus
 from djstripe.settings import STRIPE_LIVE_MODE
 from stripe.error import CardError, InvalidRequestError
@@ -231,13 +230,6 @@ class BillingView(LoginRequiredMixin, PaymentsMixin, SimpleReactView):
 				),
 			}
 		}
-
-	def get(self, request):
-		# Temporarily find pending PayPal BillingAgreement (if any) and refresh them
-		for agreement in BillingAgreement.objects.filter(user=request.user, state="Pending"):
-			BillingAgreement.find_and_sync(agreement.id)
-
-		return super(BillingView, self).get(request)
 
 
 class SubscribeView(LoginRequiredMixin, PaymentsMixin, View):

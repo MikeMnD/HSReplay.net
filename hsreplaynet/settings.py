@@ -116,6 +116,7 @@ MIDDLEWARE = [
 	"hsreplaynet.web.middleware.HostLanguageMiddleware",
 	"hsreplaynet.web.middleware.MetaTagsMiddleware",
 	"hsreplaynet.web.middleware.UserActivityMiddleware",
+	"hsreplaynet.web.middleware.PayPalSyncMiddleware",
 ]
 
 
