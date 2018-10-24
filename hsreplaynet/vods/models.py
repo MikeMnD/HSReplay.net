@@ -6,6 +6,19 @@ from pynamodb.indexes import AllProjection, GlobalSecondaryIndex
 from pynamodb.models import Model
 
 
+class TwitchVodUserIdIndex(GlobalSecondaryIndex):
+	"""A DynamoDB global secondary index to enable searching VODs by user id"""
+
+	hsreplaynet_user_id = NumberAttribute(hash_key=True)
+	combined_rank = UnicodeAttribute(range_key=True)
+
+	class Meta:
+		index_name = "by_hsreplaynet_user_id"
+		projection = AllProjection()
+		read_capacity_units = 2
+		write_capacity_units = 20
+
+
 class TwitchVodArchetypeIndex(GlobalSecondaryIndex):
 	"""A DynamoDB global secondary index to enable searching VODs by archetype id"""
 
@@ -74,6 +87,7 @@ class TwitchVod(Model):
 
 	archetype_index = TwitchVodArchetypeIndex()
 	deck_index = TwitchVodDeckStringIndex()
+	user_id_index = TwitchVodUserIdIndex()
 
 	# The TTL, in epoch seconds. DynamoDB must be told to use this attribute as the row TTL;
 	# see https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html
